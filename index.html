@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  font: 12px sans-serif;
+  background: #f7f7f7;
+  color: #73879C;
+  font-family: "Helvetica Neue",Roboto,Arial,"Droid Sans",sans-serif;
+}
+
+path {
+  stroke-width: 1px;
+  stroke: #444;
+  cursor: pointer;
+}
+
+div.tooltip {	
+    position: absolute;			
+    text-align: center;			
+    /*width: 150px;					
+    height: 28px;	*/				
+    padding: 5px;				
+    font: 12px sans-serif;
+    color: #ffffff;	
+    background: rgba(17, 17, 17, 0.9);	
+    border: 0px;		
+    border-radius: 4px;			
+    pointer-events: none;	
+}
+
+div.mapa_pe {
+	width: 1200px;
+	height:650px;
+	margin:10px auto;
+	background: #fff;
+	border: 1px solid #E6E9ED;
+}
+
+div#titulo {
+	width:1000px;
+	margin: 20px auto;
+	margin-top: 30px;
+	font-size: 40px;
+	text-align: center;
+}
+
+div#menu {
+	width: 1000px;
+	margin: 20px auto;
+	font-size: 16px;
+	text-align: center;
+}
+div#descricao {
+	width: 1000px;
+	margin: 16px auto;
+	font-size: 16px;
+	text-align: center;
+}
+div#descricao b {
+	text-decoration: underline;
+}
+
+ul{
+	list-style: none
+}
+ul li {
+	margin: 0px 10px;
+	display: inline;
+	background: #73879C;
+	border-radius: 5px;
+	color: #fff;
+	padding: 5px;
+}
+ul li.selected {
+	text-decoration: underline;
+}
+
+</style>
+<body>
+<div id="titulo">Mapa Municipal de Pernambuco</div>
+<div id="menu">
+	<ul>
+		<li id="IIP" class="selected">Índice de Infestação Predial</li>
+		<li id="IB">Índice de Breteau</li>
+		<li id="A1">A1</li>
+		<li id="A2">A2</li>
+		<li id="B">B</li>
+		<li id="C">C</li>
+		<li id="D1">D1</li>
+		<li id="D2">D2</li>
+		<li id="E">E</li>
+
+	</ul>
+</div>
+<div id="descricao">
+</div>
+<script src="./d3.v3.min.js"></script>
+<script>
+
+// Define the div for the tooltip
+
+var selected = "IIP";
+
+d3.selectAll("li").on("click", function(d){
+	selected = this.id;
+	console.log(selected);
+	d3.selectAll("li").classed("selected", false)
+	d3.select(this).classed("selected", true)
+	refactorColor();
+	refactorText();
+	features.selectAll("path").attr("fill", function(d){ return isNaN(d.properties[selected])?"#999":color(d.properties[selected]) } )
+})
+
+var div = d3.select("body").append("div")	
+    .attr("class", "tooltip")				
+    .style("opacity", 0);
+
+//Map dimensions (in pixels)
+var width = 1200,
+    height = 650;
+
+//Map projection
+var projection = d3.geo.mercator()
+    .scale(8500)
+    .center([-38,-8.3]) //projection center
+    .translate([width/2,height/2]) //translate to center the map in view
+
+//Generate paths based on projection
+var path = d3.geo.path()
+    .projection(projection);
+
+//Create an SVG
+var mapa  = d3.select("body").append("div")
+	.attr("class", "mapa_pe")
+
+var svg = mapa.append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+//Group for the map features
+var features = svg.append("g")
+    .attr("class","features");
+
+//Create choropleth scale
+/*var color = d3.scale.quantize()
+    .domain([0,18.9])
+    .range(d3.range(11).map(function(i) { return "q" + i + "-11"; }));*/
+/*var color = d3.scaleThreshold()
+    .domain(d3.range(2, 10))
+    .range([0, 255]);
+*/
+var color;
+function refactorColor(){
+	var domains = {
+		"IIP": [0,20],
+		"IB" : [0,30],
+		"A1" : [0,13],
+		"A2" : [0,322],
+		"B"	 : [0,43],
+		"C"	 : [0,45],
+		"D1" : [0,6],
+		"D2" : [0,21],
+		"E"	 : [0,3]
+	}
+
+	color = d3.scale.quantize()
+    .domain(domains[selected])
+    .range(d3.range(255).map(function(i) { return "#ff"+("0"+(255-i).toString(16)).slice(-2)+("0"+(255-i).toString(16)).slice(-2); }));
+}
+refactorColor();
+
+var indice_desc;
+function refactorText(){
+	var descriptions = {
+		"IIP": "Por meio do <b>Índice de Infestação Predial</b> (IIP), pode-se levantar o percentual de edifícios positivos (com a presença de larvas de A. aegypti). Embora seja utilizado para mensurar o nível populacional do vetor, não considera o número dos recipientes positivos nem o potencial produtivo de cada recipiente. Apesar desses problemas, é de grande utilidade, pois fornece o percentual de casas positivas. (IMÓVEIS POSITIVOS / IMÓVEIS PESQUISADOS x 100)",
+		"IB" : "O <b>Índice de Breteau</b> (IB) é o índice mais comumente utilizado e leva em consideração a relação entre o número de recipientes positivos e o número de imóveis pesquisados, embora também não leve em conta a produtividade dos diversos tipos de criadouros. É corrigido de forma que o resultado seja expresso para 100 imóveis. (RECIPIENTES POSITIVOS / IMÓVEIS PESQUISADOS x 100)",
+		"A1" : "<b>Criadouros em potencial do tipo A1</b>: Depósitos de água elevados, ligados à rede pública e/ou ao sistema de captação mecânica em poço, cisternas ou minas d’água – caixas d’água, tambores, depósitos de alvenaria.",
+		"A2" : "<b>Criadouros em potencial do tipo A2</b>: Depósitos ao nível do solo para armazenamento doméstico – tonel, tambor, barril, tina, depósitos de barro (filtros, moringas, potes), cisternas, caixas d’água, captação de água em poço/cacimba/cisterna.",
+		"B"	 : "<b>Criadouros em potencial do tipo B</b>: Depósitos móveis – Vasos/frascos com água, pratos, garrafas retornáveis, pingadeira, recipientes de degelo em geladeiras, bebedouros em geral, pequenas fontes ornamentais, materiais em depósitos de construção (sanitários estocados, canos, etc.), objetos religiosos/rituais",
+		"C"	 : "<b>Criadouros em potencial do tipo C</b>: Depósitos fixos – Tanques em obras de construção civil, borracharias e hortas, calhas, lajes e toldos em desnível, ralos, sanitários em desuso, piscinas não tratadas, fontes ornamentais; cacos de vidro em muros, outras obras e adornos arquitetônicas (caixas de inspeção/passagens) ",
+		"D1" : "Passíveis de remoção – Este grupo foi dividido em dois subgrupos, para se conhecer e destacar a importância dos pneus e materiais rodantes, distinguindo-os dos demais depósitos passíveis de remoção por exigirem estratégia de ação diferenciada. <br> <b>Criadouros em potencial do tipo D1</b>: Pneus e outros materiais rodantes (câmaras de ar, manchões).",
+		"D2" : "Passíveis de remoção – Este grupo foi dividido em dois subgrupos, para se conhecer e destacar a importância dos pneus e materiais rodantes, distinguindo-os dos demais depósitos passíveis de remoção por exigirem estratégia de ação diferenciada. <br> <b>Criadouros em potencial do tipo D2</b>: Resíduos sólidos (recipientes plásticos, garrafas PET, latas), sucatas, entulhos de construção.",
+		"E"	 : "<b>Criadouros em potencial do tipo E</b>: Naturais – Exemplo: axilas de folhas (bromélias, etc.), buracos em árvores e em rochas, restos de animais (cascas, carapaças, etc.)"
+	}
+
+	d3.select("#descricao").html(descriptions[selected]);
+}
+refactorText();
+
+
+//Create zoom/pan listener
+//Change [1,Infinity] to adjust the min/max zoom scale
+var zoom = d3.behavior.zoom()
+    .scaleExtent([1, Infinity])
+    .on("zoom",zoomed);
+
+svg.call(zoom);
+
+
+
+
+d3.json("26MUE250GC_SIR.geojson",function(error,geodata) {
+  if (error) return console.log(error); //unknown error, check the console
+
+  //Create a path for each map feature in the data
+  features.selectAll("path")
+    .data(geodata.features)
+    .enter()
+    .append("path")
+    .attr("d",path)
+    .attr("fill", function(d){ return isNaN(d.properties[selected])?"#999":color(d.properties[selected]) } )
+        .on("mouseover", function(d) {		
+            div.transition()		
+                .duration(200)
+                .style("opacity", .9);		
+            div	.html(d.properties.NM_MUNICIP + "<br/> "+selected+": "  + d.properties[selected])	
+                .style("left", (d3.event.pageX) + "px")		
+                .style("top", (d3.event.pageY - 28) + "px");	
+            })					
+        .on("mouseout", function(d) {		
+            div.transition()		
+                .duration(500)		
+                .style("opacity", 0);	
+       });
+
+
+});
+
+//Update map on zoom/pan
+function zoomed() {
+  features.attr("transform", "translate(" + zoom.translate() + ")scale(" + zoom.scale() + ")")
+      .selectAll("path").style("stroke-width", 1 / zoom.scale() + "px" );
+}
+
+</script>
+</body>
